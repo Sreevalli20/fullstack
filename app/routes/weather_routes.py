@@ -26,11 +26,11 @@ router = APIRouter(tags=["Weather Data"])
     "/store-weather-data",
     response_model=StoreWeatherDataResponse,
     status_code=status.HTTP_200_OK,
-    summary="Fetch & Store Historical Weather Data in AWS S3",
+    summary="Fetch & Store Historical Weather Data",
     description=(
         "Validates coordinates and date ranges (max 31 days), calls Open-Meteo "
         "Historical Weather API for daily temperature variables, stores the JSON response "
-        "in AWS S3, and returns the filename."
+        "in Google Cloud Storage or local filesystem, and returns the filename."
     ),
 )
 @limiter.limit(settings.RATE_LIMIT_STORE)
@@ -49,8 +49,8 @@ async def store_weather_data(
     "/list-weather-files",
     response_model=ListWeatherFilesResponse,
     status_code=status.HTTP_200_OK,
-    summary="List Weather Data Files in S3",
-    description="Returns a list of stored weather JSON files from AWS S3 with file metadata.",
+    summary="List Weather Data Files",
+    description="Returns a list of stored weather JSON files from Google Cloud Storage or local filesystem with file metadata.",
 )
 @limiter.limit(settings.RATE_LIMIT_LIST)
 def list_weather_files(
@@ -67,8 +67,8 @@ def list_weather_files(
     "/weather-file-content/{filename}",
     response_model=Dict[str, Any],
     status_code=status.HTTP_200_OK,
-    summary="Get Content of Weather Data File from S3",
-    description="Downloads and returns the JSON content of a specific weather file stored in AWS S3. Returns 404 if missing.",
+    summary="Get Content of Weather Data File",
+    description="Downloads and returns the JSON content of a specific weather file stored in Google Cloud Storage or local filesystem. Returns 404 if missing.",
 )
 @limiter.limit(settings.RATE_LIMIT_CONTENT)
 def get_weather_file_content(

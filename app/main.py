@@ -13,15 +13,15 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.routes import weather_router
-from app.storage.s3_service import s3_storage_service
+from app.storage.storage_service import storage_service
 from app.utils.limiter import limiter
 from app.utils.logger import logger
 
 app = FastAPI(
-    title="Weather Data S3 Storage API",
+    title="Weather Data Storage API",
     description=(
         "Production-ready FastAPI backend for fetching historical weather data "
-        "from Open-Meteo API and storing/retrieving JSON datasets in AWS S3 using boto3."
+        "from Open-Meteo API and storing/retrieving JSON datasets in Google Cloud Storage or local filesystem."
     ),
     version="1.0.0",
     docs_url="/docs",
@@ -71,13 +71,14 @@ def health_check():
     """
     Health check endpoint returning application status and storage mode.
     """
-    storage_type = "AWS S3 (boto3)" if s3_storage_service._s3_client else "Local Storage (AWS Mock)"
+    storage_type = "Google Cloud Storage" if storage_service.storage_type == "gcs" else "Local Storage"
     return {
         "status": "healthy",
         "service": "weather-data-backend",
         "storage_mode": storage_type,
-        "s3_bucket": settings.S3_BUCKET,
-        "region": settings.AWS_REGION,
+        "storage_type": storage_service.storage_type,
+        "gcs_bucket": settings.GCS_BUCKET if storage_service.storage_type == "gcs" else None,
+        "local_storage_dir": settings.LOCAL_STORAGE_DIR,
     }
 
 
@@ -86,8 +87,8 @@ def index_dashboard():
     """
     Interactive API Dashboard rendered at root route using Geometric Balance design theme.
     """
-    storage_mode = "AWS S3 (boto3)" if s3_storage_service._s3_client else "Local S3 Fallback (Dev Mode)"
-    status_badge_color = "bg-green-100 text-green-700 border-green-200" if s3_storage_service._s3_client else "bg-amber-100 text-amber-700 border-amber-200"
+    storage_mode = "Google Cloud Storage" if storage_service.storage_type == "gcs" else "Local Storage"
+    status_badge_color = "bg-green-100 text-green-700 border-green-200" if storage_service.storage_type == "gcs" else "bg-amber-100 text-amber-700 border-amber-200"
 
     html_content = f"""
     <!DOCTYPE html>
@@ -132,12 +133,12 @@ def index_dashboard():
                     <p class="text-[10px] text-slate-400 uppercase font-bold mb-3 tracking-widest">Environment Config</p>
                     <div class="space-y-2">
                         <div class="bg-slate-800/80 p-2.5 rounded-lg flex justify-between items-center border border-slate-700/50">
-                            <span class="text-[11px] font-medium text-slate-300">AWS_REGION</span>
-                            <span class="text-[11px] font-mono text-green-400 font-bold">{settings.AWS_REGION}</span>
+                            <span class="text-[11px] font-medium text-slate-300">STORAGE_TYPE</span>
+                            <span class="text-[11px] font-mono text-green-400 font-bold">{settings.STORAGE_TYPE}</span>
                         </div>
                         <div class="bg-slate-800/80 p-2.5 rounded-lg flex justify-between items-center border border-slate-700/50">
-                            <span class="text-[11px] font-medium text-slate-300">S3_BUCKET</span>
-                            <span class="text-[11px] font-mono text-green-400 font-bold truncate max-w-[100px]">{settings.S3_BUCKET}</span>
+                            <span class="text-[11px] font-medium text-slate-300">GCS_BUCKET</span>
+                            <span class="text-[11px] font-mono text-green-400 font-bold truncate max-w-[100px]">{settings.GCS_BUCKET}</span>
                         </div>
                     </div>
                 </div>
@@ -185,15 +186,15 @@ def index_dashboard():
                         <p class="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-1">Total Weather Files</p>
                         <p id="totalFilesStat" class="text-3xl font-light text-slate-900">0</p>
                         <div class="mt-3 flex items-center text-xs text-green-600 font-bold">
-                            <span>S3 Objects Syncing</span>
+                            <span>Storage Objects Syncing</span>
                         </div>
                     </div>
 
                     <div class="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                        <p class="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-1">AWS S3 Target</p>
-                        <p class="text-xl font-semibold text-slate-900 truncate" title="{settings.S3_BUCKET}">{settings.S3_BUCKET}</p>
+                        <p class="text-slate-500 text-[11px] font-bold uppercase tracking-wider mb-1">Storage Target</p>
+                        <p class="text-xl font-semibold text-slate-900 truncate" title="{settings.GCS_BUCKET}">{settings.GCS_BUCKET}</p>
                         <div class="mt-3 flex items-center text-xs text-blue-600 font-bold">
-                            <span>Region: {settings.AWS_REGION}</span>
+                            <span>Type: {settings.STORAGE_TYPE}</span>
                         </div>
                     </div>
 
@@ -209,7 +210,7 @@ def index_dashboard():
                         <p class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Service Stack</p>
                         <div class="font-mono text-xs space-y-1 mt-2">
                             <div class="flex justify-between border-b border-slate-800 py-0.5">
-                                <span class="text-slate-300">boto3</span><span class="text-green-400 font-bold">ACTIVE</span>
+                                <span class="text-slate-300">google-cloud-storage</span><span class="text-green-400 font-bold">ACTIVE</span>
                             </div>
                             <div class="flex justify-between border-b border-slate-800 py-0.5">
                                 <span class="text-slate-300">httpx</span><span class="text-green-400 font-bold">ACTIVE</span>
@@ -256,7 +257,7 @@ def index_dashboard():
 
                             <div class="pt-2 mt-auto">
                                 <button type="submit" id="submitBtn" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition uppercase tracking-wider shadow">
-                                    Fetch & Store in AWS S3
+                                    Fetch & Store Weather Data
                                 </button>
                             </div>
                         </form>
@@ -264,7 +265,7 @@ def index_dashboard():
                         <div id="formStatus" class="mt-4 hidden p-3 rounded-lg text-xs font-mono"></div>
                     </div>
 
-                    <!-- Right Column: S3 File Browser & Content -->
+                    <!-- Right Column: Storage File Browser & Content -->
                     <div class="lg:col-span-7 space-y-6">
                         <!-- File Browser Card -->
                         <div class="bg-white border border-slate-200 p-6 rounded-xl shadow-sm">
@@ -279,7 +280,7 @@ def index_dashboard():
                             </div>
 
                             <div id="fileListContainer" class="space-y-2 max-h-52 overflow-y-auto pr-1">
-                                <p class="text-xs text-slate-400 font-mono">Loading stored S3 weather files...</p>
+                                <p class="text-xs text-slate-400 font-mono">Loading stored weather files...</p>
                             </div>
                         </div>
 
@@ -293,7 +294,7 @@ def index_dashboard():
                                 <span id="activeFilename" class="text-xs font-mono font-medium text-slate-500 truncate max-w-[200px]">No file selected</span>
                             </div>
 
-                            <pre id="jsonViewer" class="bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs font-mono overflow-x-auto max-h-72 border border-slate-800">Select a file from the list above to view S3 JSON payload</pre>
+                            <pre id="jsonViewer" class="bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs font-mono overflow-x-auto max-h-72 border border-slate-800">Select a file from the list above to view JSON payload</pre>
                         </div>
                     </div>
 
@@ -309,7 +310,7 @@ def index_dashboard():
                         <span class="text-[10px] text-slate-400 font-mono uppercase">Live Log Output</span>
                     </div>
                     <div id="logConsole" class="font-mono text-[11px] space-y-2 max-h-40 overflow-y-auto bg-slate-950 p-4 rounded-lg text-slate-300">
-                        <div><span class="text-blue-400 font-bold">[INFO]</span> Service initialized. AWS S3 Storage handler ready.</div>
+                        <div><span class="text-blue-400 font-bold">[INFO]</span> Service initialized. Storage handler ready.</div>
                     </div>
                 </div>
 
@@ -322,7 +323,7 @@ def index_dashboard():
                         </div>
                         <div class="flex items-center gap-2.5">
                             <div class="w-2.5 h-2.5 bg-blue-300 rounded-full"></div>
-                            <span class="text-xs font-bold uppercase tracking-wider">boto3 S3 Sync: Active</span>
+                            <span class="text-xs font-bold uppercase tracking-wider">Storage Sync: Active</span>
                         </div>
                     </div>
                     <span class="font-mono text-xs text-blue-100 uppercase font-semibold">Build: FastAPI v1.0.0</span>
@@ -400,7 +401,7 @@ def index_dashboard():
                 const btn = document.getElementById('submitBtn');
                 const statusDiv = document.getElementById('formStatus');
                 btn.disabled = true;
-                btn.innerText = "Fetching Open-Meteo & Uploading to S3...";
+                btn.innerText = "Fetching Open-Meteo & Uploading...";
                 statusDiv.classList.add('hidden');
                 
                 const payload = {{
@@ -422,7 +423,7 @@ def index_dashboard():
                     if (res.ok) {{
                         statusDiv.className = "mt-4 p-3 rounded-lg text-xs font-mono bg-emerald-50 text-emerald-800 border border-emerald-200";
                         statusDiv.innerText = "✓ Success! Saved file: " + data.file;
-                        appendLog('INFO', `S3 Storage Success: Created ${{data.file}}`);
+                        appendLog('INFO', `Storage Success: Created ${{data.file}}`);
                         fetchFileList();
                         viewFile(data.file);
                     }} else {{
@@ -438,7 +439,7 @@ def index_dashboard():
                     statusDiv.classList.remove('hidden');
                 }} finally {{
                     btn.disabled = false;
-                    btn.innerText = "Fetch & Store in AWS S3";
+                    btn.innerText = "Fetch & Store Weather Data";
                 }}
             }});
 

@@ -2,7 +2,7 @@
 Application Configuration Module.
 
 Loads environment variables using pydantic-settings.
-Supports AWS S3 credentials and Open-Meteo API configuration.
+Supports Google Cloud Storage and local storage configuration.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,10 +12,12 @@ class Settings(BaseSettings):
     """
     Application configuration loaded from environment variables or .env file.
     """
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_REGION: str = "us-east-1"
-    S3_BUCKET: str = "weather-data-bucket"
+    # Storage Configuration
+    STORAGE_TYPE: str = "local"  # Options: "local" or "gcs"
+    GCS_BUCKET: str = "weather-data-bucket"
+    LOCAL_STORAGE_DIR: str = "./data"
+    
+    # Open-Meteo Historical Weather API Base URL
     OPEN_METEO_BASE_URL: str = "https://archive-api.open-meteo.com/v1/archive"
 
     # Rate Limiting Configuration
@@ -25,9 +27,6 @@ class Settings(BaseSettings):
 
     # Logging Level
     LOG_LEVEL: str = "INFO"
-
-    # Local fallback storage path when S3 credentials are not configured or available
-    LOCAL_STORAGE_DIR: str = "./data/s3_local_mock"
 
     model_config = SettingsConfigDict(
         env_file=".env",

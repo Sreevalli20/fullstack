@@ -11,16 +11,10 @@ services:
     branch: main
     healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 3000
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: AWS_REGION
-        value: us-east-1
-      - key: S3_BUCKET
-        value: weather-data-bucket
+      - key: STORAGE_TYPE
+        value: local
+      - key: LOCAL_STORAGE_PATH
+        value: data
       - key: OPEN_METEO_BASE_URL
         value: https://archive-api.open-meteo.com/v1/archive
       - key: RATE_LIMIT_STORE

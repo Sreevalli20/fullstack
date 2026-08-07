@@ -1,25 +1,12 @@
 {
   "version": 2,
   "name": "weather-frontend",
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "env": {
-    "VITE_API_BASE_URL": {
-      "description": "Backend API URL (e.g., https://your-backend.onrender.com or https://weather-backend-xyz.a.run.app)",
-      "value": "http://localhost:3000"
-    }
-  }
+  ]
 }
