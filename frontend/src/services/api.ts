@@ -7,7 +7,7 @@ import {
   HealthStatusResponse,
 } from '../types/weather';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = 'https://weather-explorer-backend-s600.onrender.com';
 
 console.log('API_BASE_URL:', API_BASE_URL);
 
