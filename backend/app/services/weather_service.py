@@ -17,7 +17,7 @@ from app.models.weather import (
     ListWeatherFilesResponse,
     WeatherFileInfo,
 )
-from app.storage.s3_service import s3_storage_service as default_s3_storage_service
+from app.storage import get_storage
 from app.utils.logger import logger
 
 
@@ -26,15 +26,15 @@ class WeatherService:
     Service responsible for fetching historical weather data and managing files.
     """
 
-    def __init__(self, s3_service=None):
+    def __init__(self, storage=None):
         self.base_url = settings.OPEN_METEO_BASE_URL
-        self.storage_service = s3_service or default_s3_storage_service
+        self.storage = storage or get_storage()
 
     async def fetch_and_store_weather_data(
         self, request: StoreWeatherDataRequest
     ) -> StoreWeatherDataResponse:
         """
-        Fetches historical weather data from Open-Meteo API and stores the JSON in S3.
+        Fetches historical weather data from Open-Meteo API and stores the JSON in storage.
         """
         lat = request.latitude
         lon = request.longitude
@@ -91,20 +91,20 @@ class WeatherService:
                 detail=f"Failed to communicate with Open-Meteo API: {str(exc)}"
             )
 
-        # Construct S3 filename: weather_<lat>_<lon>_<start>_<end>_<timestamp>.json
+        # Construct filename: weather_<lat>_<lon>_<start>_<end>_<timestamp>.json
         timestamp = int(time.time())
         filename = f"weather_{lat}_{lon}_{start_str}_{end_str}_{timestamp}.json"
 
-        # Store complete JSON response in AWS S3
-        self.storage_service.upload_json(filename, weather_json)
+        # Store complete JSON response in storage
+        self.storage.save(filename, weather_json)
 
         return StoreWeatherDataResponse(status="ok", file=filename)
 
     def list_weather_files(self) -> ListWeatherFilesResponse:
         """
-        Lists stored weather JSON files from S3.
+        Lists stored weather JSON files from storage.
         """
-        raw_files = self.storage_service.list_files()
+        raw_files = self.storage.list_files()
         file_infos = [
             WeatherFileInfo(
                 name=f["name"],
@@ -119,7 +119,7 @@ class WeatherService:
         """
         Downloads and returns JSON content for a stored weather file.
         """
-        return self.storage_service.get_file_content(filename)
+        return self.storage.read_file(filename)
 
 
 # Global singleton instance of WeatherService

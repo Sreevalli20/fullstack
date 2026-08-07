@@ -57,12 +57,12 @@ class StoreWeatherDataResponse(BaseModel):
     Response schema for POST /store-weather-data endpoint.
     """
     status: str = Field(default="ok", description="Status indicator")
-    file: str = Field(..., description="Name of the stored JSON file in S3")
+    file: str = Field(..., description="Name of the stored JSON file")
 
 
 class WeatherFileInfo(BaseModel):
     """
-    Metadata info for a single weather file stored in S3.
+    Metadata info for a single weather file stored in storage.
     """
     name: str = Field(..., description="Filename")
     size: int = Field(..., description="File size in bytes")

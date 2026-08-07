@@ -1,5 +1,5 @@
 """
-Unit tests for WeatherService and S3StorageService with mocked dependencies.
+Unit tests for WeatherService and storage implementations with mocked dependencies.
 """
 
 import json
@@ -10,17 +10,17 @@ from fastapi import HTTPException
 
 from app.models.weather import StoreWeatherDataRequest
 from app.services.weather_service import WeatherService
-from app.storage.s3_service import S3StorageService
+from app.storage.storage_interface import StorageInterface
 
 
 @pytest.fixture
-def mock_s3_service():
-    service = MagicMock(spec=S3StorageService)
-    service.upload_json.return_value = "weather_37.7749_-122.4194_2024-01-01_2024-01-05_12345678.json"
+def mock_storage():
+    service = MagicMock(spec=StorageInterface)
+    service.save.return_value = "weather_37.7749_-122.4194_2024-01-01_2024-01-05_12345678.json"
     service.list_files.return_value = [
         {"name": "test_file.json", "size": 1024, "created_at": "2026-08-06T12:00:00+00:00"}
     ]
-    service.get_file_content.return_value = {
+    service.read_file.return_value = {
         "latitude": 37.7749,
         "longitude": -122.4194,
         "daily": {
@@ -33,8 +33,8 @@ def mock_s3_service():
 
 
 @pytest.mark.asyncio
-async def test_weather_service_fetch_and_store_success(mock_s3_service):
-    service = WeatherService(s3_service=mock_s3_service)
+async def test_weather_service_fetch_and_store_success(mock_storage):
+    service = WeatherService(storage=mock_storage)
     request_data = StoreWeatherDataRequest(
         latitude=37.7749,
         longitude=-122.4194,
@@ -66,12 +66,12 @@ async def test_weather_service_fetch_and_store_success(mock_s3_service):
         assert result.status == "ok"
         assert result.file.startswith("weather_37.7749_-122.4194_2024-01-01_2024-01-05_")
         assert result.file.endswith(".json")
-        mock_s3_service.upload_json.assert_called_once()
+        mock_storage.save.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_weather_service_fetch_open_meteo_error(mock_s3_service):
-    service = WeatherService(s3_service=mock_s3_service)
+async def test_weather_service_fetch_open_meteo_error(mock_storage):
+    service = WeatherService(storage=mock_storage)
     request_data = StoreWeatherDataRequest(
         latitude=37.7749,
         longitude=-122.4194,
@@ -90,45 +90,35 @@ async def test_weather_service_fetch_open_meteo_error(mock_s3_service):
         assert exc_info.value.status_code == 502
 
 
-def test_s3_storage_service_local_fallback(tmp_path):
-    # Test S3StorageService with local storage directory
-    with patch("app.storage.s3_service.settings") as mock_settings:
-        mock_settings.S3_BUCKET = "test-bucket"
-        mock_settings.AWS_REGION = "us-east-1"
-        mock_settings.AWS_ACCESS_KEY_ID = ""
-        mock_settings.AWS_SECRET_ACCESS_KEY = ""
-        mock_settings.LOCAL_STORAGE_DIR = str(tmp_path)
+def test_local_storage(tmp_path):
+    # Test LocalStorage with local storage directory
+    from app.storage.local_storage import LocalStorage
+    
+    storage = LocalStorage(storage_dir=str(tmp_path))
 
-        storage = S3StorageService()
-        storage._s3_client = None  # Force local fallback
+    # Test Save
+    filename = "test_weather.json"
+    content = {"location": "San Francisco", "temp": 18.5}
+    saved_file = storage.save(filename, content)
+    assert saved_file == filename
 
-        # Test Upload
-        filename = "test_weather.json"
-        content = {"location": "San Francisco", "temp": 18.5}
-        saved_file = storage.upload_json(filename, content)
-        assert saved_file == filename
+    # Test Listing
+    files = storage.list_files()
+    assert len(files) == 1
+    assert files[0]["name"] == filename
 
-        # Test Listing
-        files = storage.list_files()
-        assert len(files) == 1
-        assert files[0]["name"] == filename
-
-        # Test Retrieval
-        retrieved = storage.get_file_content(filename)
-        assert retrieved["location"] == "San Francisco"
+    # Test Retrieval
+    retrieved = storage.read_file(filename)
+    assert retrieved["location"] == "San Francisco"
 
 
-def test_s3_storage_service_not_found(tmp_path):
-    with patch("app.storage.s3_service.settings") as mock_settings:
-        mock_settings.S3_BUCKET = "test-bucket"
-        mock_settings.AWS_REGION = "us-east-1"
-        mock_settings.AWS_ACCESS_KEY_ID = ""
-        mock_settings.AWS_SECRET_ACCESS_KEY = ""
-        mock_settings.LOCAL_STORAGE_DIR = str(tmp_path)
+def test_local_storage_not_found(tmp_path):
+    from app.storage.local_storage import LocalStorage
+    from fastapi import HTTPException
+    import pytest
+    
+    storage = LocalStorage(storage_dir=str(tmp_path))
 
-        storage = S3StorageService()
-        storage._s3_client = None
-
-        with pytest.raises(HTTPException) as exc_info:
-            storage.get_file_content("non_existent_file.json")
-        assert exc_info.value.status_code == 404
+    with pytest.raises(HTTPException) as exc_info:
+        storage.read_file("non_existent_file.json")
+    assert exc_info.value.status_code == 404

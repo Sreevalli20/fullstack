@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.routes import weather_router
-from app.storage.storage_service import storage_service
+from app.storage import get_storage, GCSStorage
 from app.utils.limiter import limiter
 from app.utils.logger import logger
 
@@ -71,13 +71,14 @@ def health_check():
     """
     Health check endpoint returning application status and storage mode.
     """
-    storage_type = "Google Cloud Storage" if storage_service.storage_type == "gcs" else "Local Storage"
+    storage = get_storage()
+    storage_type = "Google Cloud Storage" if isinstance(storage, GCSStorage) else "Local Storage"
     return {
         "status": "healthy",
         "service": "weather-data-backend",
         "storage_mode": storage_type,
-        "storage_type": storage_service.storage_type,
-        "gcs_bucket": settings.GCS_BUCKET if storage_service.storage_type == "gcs" else None,
+        "storage_type": settings.STORAGE_TYPE,
+        "gcs_bucket": settings.GCS_BUCKET if settings.STORAGE_TYPE == "gcs" else None,
         "local_storage_dir": settings.LOCAL_STORAGE_DIR,
     }
 
@@ -87,8 +88,9 @@ def index_dashboard():
     """
     Interactive API Dashboard rendered at root route using Geometric Balance design theme.
     """
-    storage_mode = "Google Cloud Storage" if storage_service.storage_type == "gcs" else "Local Storage"
-    status_badge_color = "bg-green-100 text-green-700 border-green-200" if storage_service.storage_type == "gcs" else "bg-amber-100 text-amber-700 border-amber-200"
+    storage = get_storage()
+    storage_mode = "Google Cloud Storage" if isinstance(storage, GCSStorage) else "Local Storage"
+    status_badge_color = "bg-green-100 text-green-700 border-green-200" if isinstance(storage, GCSStorage) else "bg-amber-100 text-amber-700 border-amber-200"
 
     html_content = f"""
     <!DOCTYPE html>
@@ -96,7 +98,7 @@ def index_dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Weather Data FastAPI Backend - WeatherS3 Pro</title>
+        <title>Weather Data FastAPI Backend</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
@@ -109,7 +111,7 @@ def index_dashboard():
             <div class="p-6 border-b border-slate-800">
                 <div class="flex items-center gap-2 mb-1">
                     <div class="w-3.5 h-3.5 bg-blue-500 rounded-sm"></div>
-                    <h1 class="text-white font-bold text-lg tracking-tight">WeatherS3 Pro</h1>
+                    <h1 class="text-white font-bold text-lg tracking-tight">Weather Data API</h1>
                 </div>
                 <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest">FastAPI Backend</p>
             </div>
@@ -358,7 +360,7 @@ def index_dashboard():
                     const data = await res.json();
                     
                     if (!data.files || data.files.length === 0) {{
-                        container.innerHTML = '<p class="text-xs text-slate-400 font-mono py-2">No weather files stored in S3 yet.</p>';
+                        container.innerHTML = '<p class="text-xs text-slate-400 font-mono py-2">No weather files stored yet.</p>';
                         document.getElementById('totalFilesStat').innerText = '0';
                         return;
                     }}
@@ -384,7 +386,7 @@ def index_dashboard():
             async function viewFile(filename) {{
                 document.getElementById('activeFilename').innerText = filename;
                 const viewer = document.getElementById('jsonViewer');
-                viewer.innerText = "Downloading payload from S3...";
+                viewer.innerText = "Downloading payload...";
                 try {{
                     const res = await fetch('/weather-file-content/' + encodeURIComponent(filename));
                     const data = await res.json();
