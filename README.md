@@ -1,25 +1,25 @@
-# WeatherS3 Pro - Weather Data FastAPI Backend & React Dashboard
+# Weather Explorer - Weather Data FastAPI Backend & React Dashboard
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg?style=flat&logo=react&logoColor=black)](https://reactjs.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1-38B2AC.svg?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![boto3](https://img.shields.io/badge/AWS_boto3-S3_Storage-FF9900.svg?style=flat&logo=amazon-aws&logoColor=white)](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
+[![Google Cloud Storage](https://img.shields.io/badge/Google_Cloud_Storage-Storage-4285F4.svg?style=flat&logo=google-cloud&logoColor=white)](https://cloud.google.com/storage)
 [![pytest](https://img.shields.io/badge/Pytest-Passed-success.svg?style=flat&logo=pytest&logoColor=white)](https://docs.pytest.org/)
 
-Production-ready full-stack application combining a **FastAPI backend** (Open-Meteo API integration + AWS S3 persistence via `boto3`, `slowapi` rate limiting, structured logging) with a **React + Vite + Tailwind CSS + Recharts** interactive analytics dashboard.
+Production-ready full-stack application combining a **FastAPI backend** (Open-Meteo API integration + Google Cloud Storage/local storage, `slowapi` rate limiting, structured logging) with a **React + Vite + Tailwind CSS + Recharts** interactive analytics dashboard.
 
 ---
 
 ## 🌟 Project Overview
 
-**WeatherS3 Pro** empowers developers and analysts to query historical daily weather datasets worldwide via Open-Meteo's API, enforce strict input validation, persist the structured JSON payloads into AWS S3 buckets (or local S3 mock fallback), and analyze temperature trends using an interactive dashboard.
+**Weather Explorer** empowers developers and analysts to query historical daily weather datasets worldwide via Open-Meteo's API, enforce strict input validation, persist the structured JSON payloads into Google Cloud Storage or local filesystem, and analyze temperature trends using an interactive dashboard.
 
 ### Core Capabilities:
 - **FastAPI Backend**: Asynchronous HTTP client (`httpx`), modular architecture, Pydantic input/output schemas with 31-day range limit enforcement, and rate-limiting using `slowapi`.
-- **AWS S3 Integration**: Flexible credentials handling via `boto3` supporting both explicit keys and the default AWS credential provider chain (IAM Roles, EC2/ECS metadata, AWS CLI credentials).
+- **Google Cloud Storage Integration**: Flexible storage supporting Google Cloud Storage for production and local filesystem for development.
 - **Structured Logging & Tracing**: Every request is assigned a unique `X-Request-ID` UUID, tracking process duration in milliseconds and logging key events.
-- **React Analytics Dashboard**: React 19, Vite, Tailwind CSS, Recharts temperature trend lines (°C and °F modes), searchable S3 object browser, paginated data tables with CSV export, and persistent Dark Mode.
-- **Comprehensive Unit & Integration Test Suite**: Built with `pytest` and FastAPI `TestClient`, featuring 100% mocked external API calls and S3 operations.
+- **React Analytics Dashboard**: React 19, Vite, Tailwind CSS, Recharts temperature trend lines (°C and °F modes), searchable file browser, paginated data tables with CSV export, and persistent Dark Mode.
+- **Comprehensive Unit & Integration Test Suite**: Built with `pytest` and FastAPI `TestClient`, featuring 100% mocked external API calls and storage operations.
 
 ---
 
@@ -47,16 +47,16 @@ Production-ready full-stack application combining a **FastAPI backend** (Open-Me
 |  +---------------------------+                            |                       |
 |                                                           v                       |
 |                                      +-----------------------------------------+  |
-|                                      |            S3StorageService             |  |
-|                                      | - boto3 AWS Credential Chain            |  |
-|                                      | - Local Fallback Mode for Dev           |  |
+|                                      |            StorageService               |  |
+|                                      | - Google Cloud Storage / Local Storage  |  |
+|                                      | - Automatic Fallback Mode               |  |
 |                                      +-----------------------------------------+  |
 +-----------------------------------------------------------------------------------+
                        |                                         |
                        v                                         v
 +-------------------------------------------+   +-----------------------------------+
-|      Open-Meteo Historical API            |   |           AWS S3 Bucket           |
-| (https://archive-api.open-meteo.com/v1)   |   |     (boto3 put/list/get_object)   |
+|      Open-Meteo Historical API            |   |    Google Cloud Storage / Local   |
+| (https://archive-api.open-meteo.com/v1)   |   |           Filesystem               |
 +-------------------------------------------+   +-----------------------------------+
 ```
 
@@ -65,9 +65,9 @@ Production-ready full-stack application combining a **FastAPI backend** (Open-Me
 ## 💻 Tech Stack
 
 ### Backend:
-- **Framework**: FastAPI (Python 3.12/3.14)
+- **Framework**: FastAPI (Python 3.12 for deployment)
 - **ASGI Server**: Uvicorn
-- **AWS SDK**: `boto3` (AWS S3)
+- **Storage**: Google Cloud Storage / Local Filesystem
 - **Async HTTP Client**: `httpx`
 - **Rate Limiting**: `slowapi`
 - **Validation**: Pydantic v2 & `pydantic-settings`
@@ -87,11 +87,10 @@ Production-ready full-stack application combining a **FastAPI backend** (Open-Me
 Create a `.env` file in the root directory:
 
 ```env
-# AWS Configuration (Placeholder or Actual Credentials)
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_REGION=us-east-1
-S3_BUCKET=weather-data-bucket
+# Storage Configuration
+STORAGE_TYPE=local
+GCS_BUCKET=weather-data-bucket
+LOCAL_STORAGE_DIR=./data
 
 # Open-Meteo API Base URL
 OPEN_METEO_BASE_URL=https://archive-api.open-meteo.com/v1/archive
@@ -103,31 +102,37 @@ RATE_LIMIT_CONTENT=60/minute
 
 # Logging Level
 LOG_LEVEL=INFO
-
-# Frontend API Base URL (For React Vite build)
-VITE_API_BASE_URL=http://localhost:3000
 ```
 
-> **Note on AWS Configuration**: You do **NOT** need to hardcode `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY`. `boto3` will automatically look for credentials via the default credential provider chain (IAM Roles, AWS CLI credentials, environment variables). If no AWS environment is reachable, the backend seamlessly operates in **Local Storage Fallback Mode** so all endpoints remain fully functional during development.
+For the frontend, create `frontend/.env`:
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+> **Note on Storage Configuration**: The backend supports both Google Cloud Storage (production) and local filesystem (development). Set `STORAGE_TYPE=gcs` for Google Cloud Storage or `STORAGE_TYPE=local` for local filesystem. If GCS credentials are not configured, the backend seamlessly falls back to local storage.
 
 ---
 
 ## 🚀 Local Development
 
-### Backend Setup (Python 3.14 - Docker Required)
+### Backend Setup (Python 3.12 for Docker, Python 3.14 local)
 
-**Important**: pydantic-core does not yet support Python 3.14. Use Docker for running the backend.
+**Important**: For local development with Python 3.14, use Docker. The backend is configured for Python 3.12 in Docker for deployment compatibility.
 
 ```bash
 # Using Docker Compose (Recommended)
 docker compose up --build
 ```
 
-Backend runs on: http://localhost:3000
+Backend runs on: http://localhost:8000
 
 **Alternative**: If you have Python 3.12, you can run locally:
 
 ```bash
+# Navigate to backend directory
+cd backend
+
 # Create virtual environment (Python 3.12)
 python -m venv .venv
 
@@ -147,6 +152,9 @@ uvicorn app.main:app --reload
 ### Frontend Setup (Node.js LTS 22+)
 
 ```bash
+# Navigate to frontend directory
+cd frontend
+
 # Install dependencies
 npm install
 
@@ -168,27 +176,27 @@ docker compose up --build
 ```
 
 This will start:
-- Backend on http://localhost:3000
+- Backend on http://localhost:8000
 - Frontend on http://localhost:5173
 
 ### Backend Only (Docker)
 
 ```bash
 # Build backend image
-docker build -t weather-backend .
+docker build -t weather-backend ./backend
 
 # Run backend container
-docker run -d -p 3000:3000 --env-file .env weather-backend
+docker run -d -p 8000:8000 --env-file .env weather-backend
 ```
 
 ### Frontend Only (Docker)
 
 ```bash
 # Build frontend image
-docker build -f Dockerfile.frontend -t weather-frontend .
+docker build -t weather-frontend ./frontend
 
 # Run frontend container
-docker run -d -p 5173:5173 -e VITE_API_BASE_URL=http://localhost:3000 weather-frontend
+docker run -d -p 5173:5173 -e VITE_API_URL=http://localhost:8000 weather-frontend
 ```
 
 ---
@@ -198,9 +206,9 @@ docker run -d -p 5173:5173 -e VITE_API_BASE_URL=http://localhost:3000 weather-fr
 | Method | Endpoint | Description | Rate Limit |
 |---|---|---|---|
 | `GET` | `/health` | System health status & storage mode | Unlimited |
-| `POST` | `/store-weather-data` | Fetch Open-Meteo data & persist to S3 | 10/min |
-| `GET` | `/list-weather-files` | List all stored S3 JSON weather objects | 60/min |
-| `GET` | `/weather-file-content/{filename}` | Download and inspect raw S3 JSON payload | 60/min |
+| `POST` | `/store-weather-data` | Fetch Open-Meteo data & persist to storage | 10/min |
+| `GET` | `/list-weather-files` | List all stored JSON weather objects | 60/min |
+| `GET` | `/weather-file-content/{filename}` | Download and inspect raw JSON payload | 60/min |
 
 ### Example Request Body (`POST /store-weather-data`):
 ```json
@@ -226,6 +234,9 @@ docker run -d -p 5173:5173 -e VITE_API_BASE_URL=http://localhost:3000 weather-fr
 Execute the automated test suite built with `pytest`:
 
 ```bash
+# Navigate to backend directory
+cd backend
+
 # Run tests
 python -m pytest tests/ -v
 ```
@@ -233,7 +244,7 @@ python -m pytest tests/ -v
 ### Coverage:
 - **Unit Tests (`tests/test_services.py`)**:
   - `WeatherService` fetching, parameter construction, and Open-Meteo 502/504 error handling.
-  - `S3StorageService` upload, listing, retrieval, and fallback mechanism.
+  - `StorageService` upload, listing, retrieval, and fallback mechanism.
 - **Integration Tests (`tests/test_api.py`)**:
   - `POST /store-weather-data` success and validation errors (invalid coordinates, inverted dates, >31 day range).
   - `GET /list-weather-files` listing verification.
@@ -245,46 +256,43 @@ python -m pytest tests/ -v
 
 ### Backend Deployment
 
-#### Google Cloud Run
-
-```bash
-# Build and push image
-gcloud builds submit --tag gcr.io/PROJECT_ID/weather-backend
-
-# Deploy to Cloud Run
-gcloud run deploy weather-backend \
-  --image gcr.io/PROJECT_ID/weather-backend \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --port 3000
-```
-
-Or use the provided `cloudbuild.yaml`:
-
-```bash
-gcloud builds submit --config cloudbuild.yaml
-```
-
 #### Render
 
-1. Connect your GitHub repository to Render
-2. Select "Web Service"
-3. Use the provided `render.yaml` configuration
-4. Set environment variables in the Render dashboard
+**Repository Settings:**
+- Repository: https://github.com/Sreevalli20/fullstack
+- Branch: main
+- Environment: Docker
+- Root Directory: backend
+- Dockerfile Path: Dockerfile
+- Plan: Free
+- Health Check: /health
+
+**Environment Variables:**
+- STORAGE_TYPE=local
+- LOCAL_STORAGE_DIR=data
+- OPEN_METEO_BASE_URL=https://archive-api.open-meteo.com/v1/archive
+- RATE_LIMIT_STORE=10/minute
+- RATE_LIMIT_LIST=60/minute
+- RATE_LIMIT_CONTENT=60/minute
+- LOG_LEVEL=INFO
+
+The backend will automatically use the `render.yaml` configuration when deployed to Render.
 
 ### Frontend Deployment
 
 #### Vercel
 
-1. Push code to GitHub repository
-2. Import project in Vercel dashboard
-3. Framework preset: **Vite**
-4. Build command: `npm run build`
-5. Output directory: `dist`
-6. Set environment variable: `VITE_API_BASE_URL` (your deployed backend URL)
+**Repository Settings:**
+- Repository: https://github.com/Sreevalli20/fullstack
+- Root Directory: frontend
+- Build Command: npm run build
+- Output Directory: dist
+- Framework: Vite
 
-Or use the provided `vercel.json` configuration.
+**Environment Variables:**
+- VITE_API_URL=<your-render-backend-url>
+
+The frontend will automatically use the `vercel.json` configuration when deployed to Vercel.
 
 ---
 
@@ -292,52 +300,59 @@ Or use the provided `vercel.json` configuration.
 
 ```
 .
-├── app/
-│   ├── config.py             # Pydantic settings & env configurations
-│   ├── main.py               # FastAPI entry point, middlewares, rate limiting
-│   ├── models/
-│   │   └── weather.py        # Pydantic request/response schemas & range validators
-│   ├── routes/
-│   │   └── weather_routes.py # FastAPI APIRouter endpoints
-│   ├── services/
-│   │   └── weather_service.py# Open-Meteo API integration & business logic
-│   ├── storage/
-│   │   └── s3_service.py     # boto3 S3 integration with local fallback
-│   └── utils/
-│       ├── limiter.py        # slowapi limiter instance
-│       ├── logger.py         # Structured logging utility
-│       └── validators.py     # Filename sanitization
-├── src/
-│   ├── components/           # React dashboard UI components
-│   │   ├── EmptyState.tsx
-│   │   ├── ErrorAlert.tsx
-│   │   ├── InputForm.tsx
-│   │   ├── LoadingSkeletons.tsx
-│   │   ├── LoadingSpinner.tsx
-│   │   ├── Navbar.tsx
-│   │   ├── StoredFiles.tsx
-│   │   ├── WeatherChart.tsx
-│   │   └── WeatherTable.tsx
-│   ├── hooks/
-│   │   └── useWeatherData.ts # Custom React hook for API state management
-│   ├── services/
-│   │   └── api.ts            # Axios HTTP client configuration
-│   ├── types/
-│   │   └── weather.ts        # TypeScript interfaces
-│   ├── App.tsx               # Main Dashboard layout & Dark Mode persistence
-│   └── main.tsx              # React entry point
-├── tests/
-│   ├── test_api.py           # Endpoint integration tests
-│   └── test_services.py      # Unit tests with mocks
-├── Dockerfile                # Backend production container
-├── Dockerfile.frontend       # Frontend production container
-├── docker-compose.yml        # Local development orchestration
-├── cloudbuild.yaml           # Google Cloud Run deployment
-├── render.yaml               # Render deployment
-├── vercel.json               # Vercel deployment
-├── requirements.txt          # Python dependencies (pinned for Python 3.14)
-├── package.json              # Node.js dependencies
-└── README.md                 # Project documentation
+├── backend/
+│   ├── app/
+│   │   ├── config.py             # Pydantic settings & env configurations
+│   │   ├── main.py               # FastAPI entry point, middlewares, rate limiting
+│   │   ├── models/
+│   │   │   └── weather.py        # Pydantic request/response schemas & range validators
+│   │   ├── routes/
+│   │   │   └── weather_routes.py # FastAPI APIRouter endpoints
+│   │   ├── services/
+│   │   │   └── weather_service.py# Open-Meteo API integration & business logic
+│   │   ├── storage/
+│   │   │   └── storage_service.py# Google Cloud Storage / local storage integration
+│   │   └── utils/
+│   │       ├── limiter.py        # slowapi limiter instance
+│   │       ├── logger.py         # Structured logging utility
+│   │       └── validators.py     # Filename sanitization
+│   ├── tests/
+│   │   ├── test_api.py           # Endpoint integration tests
+│   │   └── test_services.py      # Unit tests with mocks
+│   ├── Dockerfile                # Backend production container
+│   └── requirements.txt          # Python dependencies (pinned for Python 3.12)
+├── frontend/
+│   ├── src/
+│   │   ├── components/           # React dashboard UI components
+│   │   │   ├── EmptyState.tsx
+│   │   │   ├── ErrorAlert.tsx
+│   │   │   ├── InputForm.tsx
+│   │   │   ├── LoadingSkeletons.tsx
+│   │   │   ├── LoadingSpinner.tsx
+│   │   │   ├── Navbar.tsx
+│   │   │   ├── StoredFiles.tsx
+│   │   │   ├── WeatherChart.tsx
+│   │   │   └── WeatherTable.tsx
+│   │   ├── hooks/
+│   │   │   └── useWeatherData.ts # Custom React hook for API state management
+│   │   ├── services/
+│   │   │   └── api.ts            # Axios HTTP client configuration
+│   │   ├── types/
+│   │   │   └── weather.ts        # TypeScript interfaces
+│   │   ├── App.tsx               # Main Dashboard layout & Dark Mode persistence
+│   │   └── main.tsx              # React entry point
+│   ├── public/                   # Static assets
+│   ├── Dockerfile                # Frontend production container
+│   ├── package.json              # Node.js dependencies
+│   ├── vite.config.ts            # Vite configuration
+│   ├── tsconfig.json             # TypeScript configuration
+│   └── index.html                # HTML entry point
+├── docker-compose.yml            # Local development orchestration
+├── render.yaml                   # Render deployment configuration
+├── vercel.json                   # Vercel deployment configuration
+├── .env.example                  # Environment variables template
+├── .gitignore                    # Git ignore rules
+└── README.md                     # Project documentation
 ```
 
 ---
@@ -347,6 +362,9 @@ Or use the provided `vercel.json` configuration.
 ### Frontend
 
 ```bash
+# Navigate to frontend directory
+cd frontend
+
 # Build for production
 npm run build
 
@@ -382,11 +400,11 @@ git push -u origin main
 
 ## 💡 Key Design Decisions & Interview Notes
 
-1. **boto3 Default Credential Provider Chain**:
-   - Rather than forcing static `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` strings in source code, `boto3` relies on the standard AWS credential chain. This makes the container cloud-native and ready for AWS IAM Roles (ECS/EKS/EC2 Task Roles).
+1. **Google Cloud Storage Integration**:
+   - The backend supports Google Cloud Storage for production deployments and local filesystem for development. Storage type is controlled by the `STORAGE_TYPE` environment variable.
 
 2. **Graceful Storage Fallback**:
-   - To avoid developer setup friction, if S3 is unavailable or unconfigured, the app falls back to local file storage (`./data/s3_local_mock/`) without throwing crashes.
+   - To avoid developer setup friction, if Google Cloud Storage is unavailable or unconfigured, the app falls back to local file storage (`./data/`) without throwing crashes.
 
 3. **Rate Limiting with `slowapi`**:
    - Implemented IP-based rate limiting on sensitive write and list endpoints to prevent API abuse and respect Open-Meteo rate limits.
@@ -394,8 +412,8 @@ git push -u origin main
 4. **Client-Side & Server-Side Dual Validation**:
    - Input fields perform instant client-side date checks, while Pydantic schemas enforce strict bounds (-90 to 90 lat, -180 to 180 lon, 31-day range limit) on the server.
 
-5. **Python 3.14 Compatibility**:
-   - All dependencies are pinned to versions tested with Python 3.14. If any package doesn't support Python 3.14, use Docker for running the backend with Python 3.12-slim.
+5. **Python 3.12 for Deployment**:
+   - The backend uses Python 3.12 in Docker for stable deployment compatibility. Local development with Python 3.14 is supported via Docker.
 
 6. **Docker Strategy**:
    - Backend uses `python:3.12-slim` for stable deployment

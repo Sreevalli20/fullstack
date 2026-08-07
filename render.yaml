@@ -3,17 +3,17 @@
 
 services:
   - type: web
-    name: weather-backend
+    name: weather-explorer-backend
     env: docker
-    dockerfilePath: ./Dockerfile
     plan: free
-    region: oregon
+    rootDir: backend
+    dockerfilePath: Dockerfile
     branch: main
     healthCheckPath: /health
     envVars:
       - key: STORAGE_TYPE
         value: local
-      - key: LOCAL_STORAGE_PATH
+      - key: LOCAL_STORAGE_DIR
         value: data
       - key: OPEN_METEO_BASE_URL
         value: https://archive-api.open-meteo.com/v1/archive
