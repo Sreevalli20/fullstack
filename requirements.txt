@@ -1,0 +1,16 @@
+# Python 3.12 compatible pinned versions (for Docker deployment)
+# Note: pydantic-core does not yet support Python 3.14
+# Use Docker (python:3.12-slim) for running the backend
+# Local Python 3.14 setup will fail due to pydantic-core compilation errors
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+boto3==1.35.36
+httpx==0.27.2
+pydantic==2.9.2
+pydantic-settings==2.6.0
+python-dotenv==1.0.1
+jinja2==3.1.4
+slowapi==0.1.9
+pytest==8.3.3
+pytest-asyncio==0.24.0
+
